@@ -25,40 +25,40 @@ services:
         source: /*
         destination: /index.html
 
-  # API service (TypeScript)
-  - type: web
-    name: seo-audit-api
-    runtime: node
-    plan: starter
-    rootDir: typescript
-    buildCommand: npm install && npm run build
-    startCommand: node dist/api/index.js
-    envVars:
-      - key: RENDER_API_KEY
-        sync: false
-      - key: WORKFLOW_SLUG
-        sync: false
-      - key: WORKFLOW_ID
-        sync: false
-      - key: NODE_VERSION
-        value: "20"
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # ALTERNATIVE: Python API (uncomment below and comment out TypeScript above)
-  # ─────────────────────────────────────────────────────────────────────────────
+  # # API service (TypeScript)
   # - type: web
   #   name: seo-audit-api
-  #   runtime: python
+  #   runtime: node
   #   plan: starter
-  #   rootDir: python
-  #   buildCommand: pip install -r requirements.txt
-  #   startCommand: gunicorn --chdir api app:app
+  #   rootDir: typescript
+  #   buildCommand: npm install && npm run build
+  #   startCommand: node dist/api/index.js
   #   envVars:
   #     - key: RENDER_API_KEY
   #       sync: false
   #     - key: WORKFLOW_SLUG
-  #       sync: false # Set to your workflow slug (name) from the Dashboard
+  #       sync: false
   #     - key: WORKFLOW_ID
   #       sync: false
-  #     - key: PYTHON_VERSION
-  #       value: "3.12"
+  #     - key: NODE_VERSION
+  #       value: "20"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ALTERNATIVE: Python API (uncomment below and comment out TypeScript above)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - type: web
+    name: seo-audit-api
+    runtime: python
+    plan: starter
+    rootDir: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --chdir api app:app
+    envVars:
+      - key: RENDER_API_KEY
+        sync: false
+      - key: WORKFLOW_SLUG
+        sync: false # Set to your workflow slug (name) from the Dashboard
+      - key: WORKFLOW_ID
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.12"

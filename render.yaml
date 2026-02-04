@@ -61,4 +61,4 @@ services:
       - key: WORKFLOW_ID
         sync: false
       - key: PYTHON_VERSION
-        value: "3.12"
+        value: "3.12.0"

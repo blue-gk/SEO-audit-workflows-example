@@ -5,7 +5,8 @@
  * Each task runs in its own compute instance and can spawn other tasks.
  */
 
-import { task } from "@renderinc/sdk/workflows";
+import { task, type Retry } from "@renderinc/sdk/workflows";
+import pMap from "p-map";
 import {
     checkHeadings,
     checkImages,
@@ -16,6 +17,7 @@ import {
     fetchPage,
 } from "./analyzers.js";
 
+/** Final output returned by audit_site task */
 interface AuditResult {
     url: string;
     pages_analyzed: number;
@@ -25,6 +27,7 @@ interface AuditResult {
     results: PageResult[];
 }
 
+/** Analysis results for a single page */
 interface PageResult {
     url: string;
     issues: Record<string, Issue[]>;
@@ -33,6 +36,7 @@ interface PageResult {
     error?: string;
 }
 
+/** A single SEO issue found during analysis */
 interface Issue {
     type: "error" | "warning" | "info";
     message: string;
@@ -41,26 +45,12 @@ interface Issue {
     link?: string;
 }
 
-/**
- * Helper to process items in batches with controlled concurrency.
- */
-async function processBatches<T, R>(
-    items: T[],
-    batchSize: number,
-    processor: (item: T) => R | Promise<R>
-): Promise<PromiseSettledResult<Awaited<R>>[]> {
-    const results: PromiseSettledResult<Awaited<R>>[] = [];
-
-    for (let i = 0; i < items.length; i += batchSize) {
-        const batch = items.slice(i, i + batchSize);
-        const batchResults = await Promise.allSettled(
-            batch.map((item) => Promise.resolve(processor(item)))
-        );
-        results.push(...batchResults);
-    }
-
-    return results;
-}
+/** Default retry config, reusable across tasks */
+const retry: Retry = {
+    maxRetries: 2,
+    waitDurationMs: 1000,
+    backoffScaling: 1.5,
+};
 
 /**
  * Main entry point for SEO audits.
@@ -71,11 +61,7 @@ async function processBatches<T, R>(
 task(
     {
         name: "audit_site",
-        retry: {
-            maxRetries: 2,
-            waitDurationMs: 1000,
-            backoffScaling: 1.5,
-        },
+        retry
     },
     async (url: string, maxPages: number = 25, maxConcurrency: number = 10): Promise<AuditResult> => {
         const cappedMaxPages = Math.min(maxPages, 100);
@@ -95,24 +81,35 @@ task(
             };
         }
 
-        // Spawn analyze_page tasks with controlled concurrency
-        // Tasks are batched to limit parallel execution
-        const results = await processBatches(pages, cappedConcurrency, analyzePage);
+        // Spawn analyze_page tasks with controlled concurrency.
+        // pMap processes pages with a sliding window (cappedConcurrency tasks at a time).
+        // We wrap results to mimic Promise.allSettled - continue on errors, don't fail fast.
+        const results = await pMap(
+            pages,
+            async (page) => {
+                try {
+                    return { status: "fulfilled" as const, value: await analyzePage(page) };
+                } catch (error) {
+                    return { status: "rejected" as const, reason: error, page };
+                }
+            },
+            { concurrency: cappedConcurrency }
+        );
 
         // Filter out failed results and aggregate
         const successfulResults: PageResult[] = [];
         const failedPages: Array<{ url: string; error: string }> = [];
 
-        results.forEach((result, index) => {
+        for (const result of results) {
             if (result.status === "fulfilled") {
                 successfulResults.push(result.value);
             } else {
                 failedPages.push({
-                    url: pages[index],
-                    error: result.reason?.message || "Unknown error",
+                    url: result.page,
+                    error: result.reason instanceof Error ? result.reason.message : "Unknown error",
                 });
             }
-        });
+        }
 
         // Aggregate issues by category
         const allIssues: Record<string, Issue[]> = {

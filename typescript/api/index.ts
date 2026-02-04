@@ -40,7 +40,7 @@ app.use(express.json());
 // Rate limiting for audit endpoint
 const auditRateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 10, // 10 requests per minute per IP
+  max: 3, // 3 requests per minute per IP
   message: { error: "Too many audit requests, please try again later" },
   standardHeaders: true,
   legacyHeaders: false,

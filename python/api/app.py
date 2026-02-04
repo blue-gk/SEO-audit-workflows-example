@@ -52,7 +52,7 @@ def index():
 
 
 @app.route("/audit", methods=["POST"])
-@limiter.limit("10 per minute")
+@limiter.limit("3 per minute")
 def audit():
     return start_audit()
 
